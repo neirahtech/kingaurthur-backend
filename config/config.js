@@ -82,7 +82,7 @@ const config = {
     origin: process.env.NODE_ENV === 'production'
       ? [
           process.env.PRODUCTION_FRONTEND_URL,
-          ...(process.env.ADDITIONAL_ALLOWED_ORIGINS?.split(',') || [])
+          ...(process.env.ADDITIONAL_ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
         ].filter(Boolean)
       : [
           process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -95,6 +95,7 @@ const config = {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
     maxAge: 86400, // 24 hours
+    optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
   },
 
   // File Upload
@@ -160,6 +161,12 @@ config.getApiUrl = function(endpoint = '') {
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${base}${this.api.prefix}${path}`;
 };
+
+// Log CORS configuration for debugging
+if (config.env === 'production') {
+  console.log('🔒 CORS Configuration:');
+  console.log('   Allowed Origins:', config.cors.origin);
+}
 
 // Freeze configuration to prevent modifications
 Object.freeze(config.server);
