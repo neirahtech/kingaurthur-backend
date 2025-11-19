@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const config = require('./config/config');
-const { connectDatabase } = require('./config/database');
+const { connectDatabase, disconnectDatabase } = require('./config/database');
 const { initializeDatabase } = require('./config/initDB');
 
 // Import routes
@@ -49,6 +49,8 @@ app.use((req, res) => {
 });
 
 // Initialize database and start server
+let server;
+
 async function startServer() {
   try {
     // Connect to MongoDB
@@ -66,7 +68,7 @@ async function startServer() {
     await initializeDatabase();
     
     // Start server
-    app.listen(config.server.port, config.server.host, () => {
+    server = app.listen(config.server.port, config.server.host, () => {
       console.log(`\n🚀 Server running on port ${config.server.port}`);
       console.log(`📍 Environment: ${config.env}`);
       console.log(`🔗 API Base URL: ${config.getApiUrl()}`);
@@ -91,5 +93,50 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Graceful shutdown handler
+async function gracefulShutdown(signal) {
+  console.log(`\n📡 ${signal} signal received: closing HTTP server`);
+  
+  // Stop accepting new connections
+  if (server) {
+    server.close(async () => {
+      console.log('🔒 HTTP server closed');
+      
+      // Close database connection
+      await disconnectDatabase();
+      
+      console.log('👋 Process terminated gracefully');
+      process.exit(0);
+    });
+    
+    // Force close after 10 seconds
+    setTimeout(() => {
+      console.error('⚠️  Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+  } else {
+    await disconnectDatabase();
+    process.exit(0);
+  }
+}
+
+// Handle process termination signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', async (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  await disconnectDatabase();
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', async (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  await disconnectDatabase();
+  process.exit(1);
+});
 
 startServer();
