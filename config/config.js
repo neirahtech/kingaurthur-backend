@@ -81,7 +81,7 @@ const config = {
   cors: {
     origin: process.env.NODE_ENV === 'production'
       ? [
-          process.env.PRODUCTION_FRONTEND_URL,
+          ...(process.env.PRODUCTION_FRONTEND_URL?.split(',').map(o => o.trim()) || []),
           ...(process.env.ADDITIONAL_ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
         ].filter(Boolean)
       : [
